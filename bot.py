@@ -1,21 +1,20 @@
 import os
 import logging
 import requests
-import google.generativeai as genai
+from groq import Groq
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # ðŸ”§ CONFIGURATION
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8967105953:AAEIR0RHCrxlkc_u0SVMaoIaKvLa9z0EFt8")
-GEMINI_API_KEY     = os.environ.get("GEMINI_API_KEY", "AIzaSyCAdJbq3iVeRsk7PHD5i5IlWxa6lwChIYo")
-CHANNEL_USERNAME   = os.environ.get("CHANNEL_USERNAME", "@mullerapp")
+TELEGRAM_BOT_TOKEN = "8967105953:AAEIR0RHCrxlkc_u0SVMaoIaKvLa9z0EFt8"
+GROQ_API_KEY       = "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"
+CHANNEL_USERNAME   = "@mullerapp"
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 logging.basicConfig(level=logging.INFO)
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-2.0-flash")
+client = Groq(api_key=GROQ_API_KEY)
 
 SYSTEM_PROMPT = """You are a helpful assistant in a Telegram group.
 - Answer ONLY the question asked â€” keep it brief and clear (2â€“4 sentences max).
@@ -25,24 +24,29 @@ SYSTEM_PROMPT = """You are a helpful assistant in a Telegram group.
 - Do not add unnecessary greetings or filler words."""
 
 
-def fetch_channel_posts() -> list:
-    """Fetch recent posts from the channel using Telegram Bot API directly."""
-    try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
-        # Use forwardMessages approach â€” fetch channel posts via bot API
-        channel = CHANNEL_USERNAME.lstrip("@")
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getChatHistory"
+def ask_groq(prompt: str) -> str:
+    """Send prompt to Groq and get response."""
+    response = client.chat.completions.create(
+        model="llama3-8b-8192",
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt}
+        ],
+        max_tokens=300
+    )
+    return response.choices[0].message.content.strip()
 
-        # Use search messages endpoint instead
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates?limit=100"
+
+def fetch_channel_posts() -> list:
+    """Fetch recent posts from channel using Telegram Bot API."""
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates?limit=100&allowed_updates=[\"channel_post\"]"
         response = requests.get(url, timeout=10)
         data = response.json()
-
         posts = []
         if data.get("ok"):
             for update in data.get("result", []):
-                # Check for channel posts
-                msg = update.get("channel_post") or update.get("message")
+                msg = update.get("channel_post")
                 if msg and msg.get("text"):
                     chat = msg.get("chat", {})
                     username = chat.get("username", "")
@@ -57,44 +61,34 @@ def fetch_channel_posts() -> list:
         return []
 
 
-async def get_channel_context(question: str) -> dict | None:
-    """Find the most relevant channel post for the question."""
-    try:
-        posts = fetch_channel_posts()
-
-        if not posts:
-            logging.info("No channel posts found, using Gemini directly.")
-            return None
-
-        posts_text = "\n\n".join(
-            [f"[POST {i+1}]: {p['text']}" for i, p in enumerate(posts)]
-        )
-
-        relevance_prompt = f"""
-Given this question: "{question}"
+def find_relevant_post(question: str, posts: list) -> dict | None:
+    """Use Groq to find the most relevant channel post."""
+    if not posts:
+        return None
+    posts_text = "\n\n".join(
+        [f"[POST {i+1}]: {p['text']}" for i, p in enumerate(posts)]
+    )
+    prompt = f"""Given this question: "{question}"
 
 Here are recent channel posts:
 {posts_text}
 
 Which post (if any) is most relevant to answering the question?
-Reply with ONLY the post number (e.g. "3") or "NONE" if no post is relevant.
-"""
-        result = model.generate_content(relevance_prompt)
-        response_text = result.text.strip()
+Reply with ONLY the post number (e.g. "3") or "NONE" if no post is relevant."""
 
-        if response_text == "NONE" or not response_text.isdigit():
+    try:
+        result = ask_groq(prompt)
+        result = result.strip()
+        if result == "NONE" or not result.isdigit():
             return None
-
-        idx = int(response_text) - 1
+        idx = int(result) - 1
         if 0 <= idx < len(posts):
             matched = posts[idx]
             channel_name = CHANNEL_USERNAME.lstrip("@")
             link = f"https://t.me/{channel_name}/{matched['message_id']}"
             return {"text": matched["text"], "link": link}
-
     except Exception as e:
-        logging.warning(f"get_channel_context error: {e}")
-
+        logging.warning(f"find_relevant_post error: {e}")
     return None
 
 
@@ -106,11 +100,9 @@ async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     bot_username = (await context.bot.get_me()).username
 
-    # Only respond when bot is @mentioned
     if f"@{bot_username}" not in message.text:
         return
 
-    # Clean the question
     question = message.text.replace(f"@{bot_username}", "").strip()
 
     if not question:
@@ -119,32 +111,28 @@ async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_chat_action(chat_id=message.chat_id, action="typing")
 
-    # Step 1: Try to find relevant content from channel
-    channel_context = await get_channel_context(question)
+    # Search channel for relevant post
+    posts = fetch_channel_posts()
+    channel_context = find_relevant_post(question, posts)
 
-    # Step 2: Build prompt
+    # Build prompt
     if channel_context:
-        prompt = f"""{SYSTEM_PROMPT}
-
-Relevant channel post content:
+        prompt = f"""Relevant channel post:
 \"\"\"{channel_context['text']}\"\"\"
 
 User question: {question}"""
     else:
-        prompt = f"""{SYSTEM_PROMPT}
+        prompt = question
 
-User question: {question}"""
-
-    # Step 3: Generate answer with Gemini
+    # Generate answer
     try:
-        result = model.generate_content(prompt)
-        answer = result.text.strip()
+        answer = ask_groq(prompt)
     except Exception as e:
-        logging.error(f"Gemini error: {e}")
+        logging.error(f"Groq error: {e}")
         await message.reply_text(f"âš ï¸ Error: {str(e)[:200]}")
         return
 
-    # Step 4: Reply with source link if found
+    # Reply
     if channel_context:
         answer += f"\n\nðŸ“Œ *Source:* [View channel post]({channel_context['link']})"
         await message.reply_text(answer, parse_mode="Markdown")
@@ -155,7 +143,7 @@ User question: {question}"""
 def main():
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_mention))
-    print("âœ… Bot is running...")
+    print("âœ… Bot is running with Groq!")
     app.run_polling()
 
 
