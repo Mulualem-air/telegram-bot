@@ -1,22 +1,23 @@
+import os
 import logging
 import google.generativeai as genai
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 
-# ─────────────────────────────────────────────
-# 🔧 CONFIGURATION
-# ─────────────────────────────────────────────
-TELEGRAM_BOT_TOKEN = "8967105953:AAEIR0RHCrxlkc_u0SVMaoIaKvLa9z0EFt8"
-GEMINI_API_KEY     = "AIzaSyAcuHgNdJ4_y0bAIUnuQRwzlTSvgTldRT8"
-CHANNEL_USERNAME   = "@mullerapp"
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ðŸ”§ CONFIGURATION â€” reads from environment variables
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8967105953:AAEIR0RHCrxlkc_u0SVMaoIaKvLa9z0EFt8")
+GEMINI_API_KEY     = os.environ.get("GEMINI_API_KEY", "AIzaSyAcuHgNdJ4_y0bAIUnuQRwzlTSvgTldRT8")
+CHANNEL_USERNAME   = os.environ.get("CHANNEL_USERNAME", "@mullerapp")
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 logging.basicConfig(level=logging.INFO)
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-1.5-flash")
 
 SYSTEM_PROMPT = """You are a helpful assistant in a Telegram group.
-- Answer ONLY the question asked — keep it brief and clear (2–4 sentences max).
+- Answer ONLY the question asked â€” keep it brief and clear (2â€“4 sentences max).
 - Detect the user's language automatically and reply in the SAME language (Amharic or English).
 - If context from a channel post is provided, use it to answer accurately.
 - Never make up information. If unsure, say so honestly.
@@ -85,7 +86,7 @@ async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE):
     question = message.text.replace(f"@{bot_username}", "").strip()
 
     if not question:
-        await message.reply_text("❓ Please ask me a question after mentioning me!")
+        await message.reply_text("â“ Please ask me a question after mentioning me!")
         return
 
     await context.bot.send_chat_action(chat_id=message.chat_id, action="typing")
@@ -116,7 +117,7 @@ User question: {question}"""
 
     # Step 4: Reply with source link if found
     if channel_context:
-        answer += f"\n\n📌 *Source:* [View channel post]({channel_context['link']})"
+        answer += f"\n\nðŸ“Œ *Source:* [View channel post]({channel_context['link']})"
         await message.reply_text(answer, parse_mode="Markdown")
     else:
         await message.reply_text(answer)
@@ -125,7 +126,7 @@ User question: {question}"""
 def main():
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_mention))
-    print("✅ Bot is running...")
+    print("âœ… Bot is running...")
     app.run_polling()
 
 
