@@ -1,14 +1,15 @@
 import os
 import logging
+import requests
 import google.generativeai as genai
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# ðŸ”§ CONFIGURATION â€” reads from environment variables
+# ðŸ”§ CONFIGURATION
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8967105953:AAEIR0RHCrxlkc_u0SVMaoIaKvLa9z0EFt8")
-GEMINI_API_KEY     = os.environ.get("GEMINI_API_KEY", "AIzaSyAcuHgNdJ4_y0bAIUnuQRwzlTSvgTldRT8")
+GEMINI_API_KEY     = os.environ.get("GEMINI_API_KEY", "AIzaSyAr5HFZIG4M3XQNGtNX_FB8P4bs3vG8-gM")
 CHANNEL_USERNAME   = os.environ.get("CHANNEL_USERNAME", "@mullerapp")
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -24,18 +25,45 @@ SYSTEM_PROMPT = """You are a helpful assistant in a Telegram group.
 - Do not add unnecessary greetings or filler words."""
 
 
-async def get_channel_context(context: ContextTypes.DEFAULT_TYPE, question: str) -> dict | None:
-    """Fetch recent channel posts and find the most relevant one."""
+def fetch_channel_posts() -> list:
+    """Fetch recent posts from the channel using Telegram Bot API directly."""
     try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
+        # Use forwardMessages approach â€” fetch channel posts via bot API
+        channel = CHANNEL_USERNAME.lstrip("@")
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getChatHistory"
+
+        # Use search messages endpoint instead
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates?limit=100"
+        response = requests.get(url, timeout=10)
+        data = response.json()
+
         posts = []
-        async for message in context.bot.get_chat_history(CHANNEL_USERNAME, limit=50):
-            if message.text:
-                posts.append({
-                    "text": message.text[:500],
-                    "message_id": message.message_id
-                })
+        if data.get("ok"):
+            for update in data.get("result", []):
+                # Check for channel posts
+                msg = update.get("channel_post") or update.get("message")
+                if msg and msg.get("text"):
+                    chat = msg.get("chat", {})
+                    username = chat.get("username", "")
+                    if username.lower() == CHANNEL_USERNAME.lstrip("@").lower():
+                        posts.append({
+                            "text": msg["text"][:500],
+                            "message_id": msg["message_id"]
+                        })
+        return posts
+    except Exception as e:
+        logging.warning(f"fetch_channel_posts error: {e}")
+        return []
+
+
+async def get_channel_context(question: str) -> dict | None:
+    """Find the most relevant channel post for the question."""
+    try:
+        posts = fetch_channel_posts()
 
         if not posts:
+            logging.info("No channel posts found, using Gemini directly.")
             return None
 
         posts_text = "\n\n".join(
@@ -65,7 +93,7 @@ Reply with ONLY the post number (e.g. "3") or "NONE" if no post is relevant.
             return {"text": matched["text"], "link": link}
 
     except Exception as e:
-        logging.warning(f"Could not fetch channel context: {e}")
+        logging.warning(f"get_channel_context error: {e}")
 
     return None
 
@@ -92,7 +120,7 @@ async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_chat_action(chat_id=message.chat_id, action="typing")
 
     # Step 1: Try to find relevant content from channel
-    channel_context = await get_channel_context(context, question)
+    channel_context = await get_channel_context(question)
 
     # Step 2: Build prompt
     if channel_context:
@@ -112,10 +140,8 @@ User question: {question}"""
         result = model.generate_content(prompt)
         answer = result.text.strip()
     except Exception as e:
-        error_msg = str(e)
-        logging.error(f"Gemini error: {error_msg}")
-        # Show actual error to help debug
-        await message.reply_text(f"âš ï¸ Debug error: {error_msg[:200]}")
+        logging.error(f"Gemini error: {e}")
+        await message.reply_text(f"âš ï¸ Error: {str(e)[:200]}")
         return
 
     # Step 4: Reply with source link if found
