@@ -9,7 +9,7 @@ from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTyp
 # ðŸ”§ CONFIGURATION
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8967105953:AAEIR0RHCrxlkc_u0SVMaoIaKvLa9z0EFt8")
-GEMINI_API_KEY     = os.environ.get("GEMINI_API_KEY", "AIzaSyAr5HFZIG4M3XQNGtNX_FB8P4bs3vG8-gM")
+GEMINI_API_KEY     = os.environ.get("GEMINI_API_KEY", "AIzaSyCAdJbq3iVeRsk7PHD5i5IlWxa6lwChIYo")
 CHANNEL_USERNAME   = os.environ.get("CHANNEL_USERNAME", "@mullerapp")
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
