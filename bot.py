@@ -14,7 +14,7 @@ CHANNEL_USERNAME   = os.environ.get("CHANNEL_USERNAME", "@mullerapp")
 
 logging.basicConfig(level=logging.INFO)
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash")
+model = genai.GenerativeModel("gemini-2.0-flash")
 
 SYSTEM_PROMPT = """You are a helpful assistant in a Telegram group.
 - Answer ONLY the question asked â€” keep it brief and clear (2â€“4 sentences max).
@@ -112,8 +112,11 @@ User question: {question}"""
         result = model.generate_content(prompt)
         answer = result.text.strip()
     except Exception as e:
-        logging.error(f"Gemini error: {e}")
-        answer = "Sorry, I couldn't generate an answer right now. Please try again."
+        error_msg = str(e)
+        logging.error(f"Gemini error: {error_msg}")
+        # Show actual error to help debug
+        await message.reply_text(f"âš ï¸ Debug error: {error_msg[:200]}")
+        return
 
     # Step 4: Reply with source link if found
     if channel_context:
