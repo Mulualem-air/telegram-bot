@@ -25,7 +25,6 @@ SYSTEM_PROMPT = """You are a helpful assistant in a Telegram group.
 
 
 def ask_groq(prompt: str) -> str:
-    """Send prompt to Groq and get response."""
     response = client.chat.completions.create(
         model="llama3-8b-8192",
         messages=[
@@ -38,9 +37,8 @@ def ask_groq(prompt: str) -> str:
 
 
 def fetch_channel_posts() -> list:
-    """Fetch recent posts from channel using Telegram Bot API."""
     try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates?limit=100&allowed_updates=[\"channel_post\"]"
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates?limit=100"
         response = requests.get(url, timeout=10)
         data = response.json()
         posts = []
@@ -62,7 +60,6 @@ def fetch_channel_posts() -> list:
 
 
 def find_relevant_post(question: str, posts: list) -> dict | None:
-    """Use Groq to find the most relevant channel post."""
     if not posts:
         return None
     posts_text = "\n\n".join(
@@ -75,7 +72,6 @@ Here are recent channel posts:
 
 Which post (if any) is most relevant to answering the question?
 Reply with ONLY the post number (e.g. "3") or "NONE" if no post is relevant."""
-
     try:
         result = ask_groq(prompt)
         result = result.strip()
@@ -93,7 +89,6 @@ Reply with ONLY the post number (e.g. "3") or "NONE" if no post is relevant."""
 
 
 async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle messages where the bot is mentioned."""
     message = update.message
     if not message or not message.text:
         return
@@ -111,11 +106,9 @@ async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_chat_action(chat_id=message.chat_id, action="typing")
 
-    # Search channel for relevant post
     posts = fetch_channel_posts()
     channel_context = find_relevant_post(question, posts)
 
-    # Build prompt
     if channel_context:
         prompt = f"""Relevant channel post:
 \"\"\"{channel_context['text']}\"\"\"
@@ -124,7 +117,6 @@ User question: {question}"""
     else:
         prompt = question
 
-    # Generate answer
     try:
         answer = ask_groq(prompt)
     except Exception as e:
@@ -132,7 +124,6 @@ User question: {question}"""
         await message.reply_text(f"âš ï¸ Error: {str(e)[:200]}")
         return
 
-    # Reply
     if channel_context:
         answer += f"\n\nðŸ“Œ *Source:* [View channel post]({channel_context['link']})"
         await message.reply_text(answer, parse_mode="Markdown")
@@ -141,10 +132,15 @@ User question: {question}"""
 
 
 def main():
-    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
-    app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_mention))
+    app = (
+        ApplicationBuilder()
+        .token(TELEGRAM_BOT_TOKEN)
+        .arbitrary_callback_data(False)
+        .build()
+    )
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_mention))
     print("âœ… Bot is running with Groq!")
-    app.run_polling()
+    app.run_polling(allowed_updates=["message", "channel_post"], drop_pending_updates=True)
 
 
 if __name__ == "__main__":
