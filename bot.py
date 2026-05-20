@@ -1,12 +1,11 @@
 import os
 import logging
 import requests
+import asyncio
 from groq import Groq
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# ðŸ”§ CONFIGURATION
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 TELEGRAM_BOT_TOKEN = "8967105953:AAEIR0RHCrxlkc_u0SVMaoIaKvLa9z0EFt8"
 GROQ_API_KEY       = "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"
@@ -19,73 +18,30 @@ client = Groq(api_key=GROQ_API_KEY)
 SYSTEM_PROMPT = """You are a helpful assistant in a Telegram group.
 - Answer ONLY the question asked â€” keep it brief and clear (2â€“4 sentences max).
 - Detect the user's language automatically and reply in the SAME language (Amharic or English).
-- If context from a channel post is provided, use it to answer accurately.
 - Never make up information. If unsure, say so honestly.
 - Do not add unnecessary greetings or filler words."""
 
 
-def ask_groq(prompt: str) -> str:
+def clear_telegram_conflict():
+    """Clear any existing webhook or conflicting connections."""
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/deleteWebhook?drop_pending_updates=true"
+        response = requests.get(url, timeout=10)
+        logging.info(f"Cleared webhook: {response.json()}")
+    except Exception as e:
+        logging.warning(f"Could not clear webhook: {e}")
+
+
+def ask_groq(question: str) -> str:
     response = client.chat.completions.create(
         model="llama3-70b-8192",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": question}
         ],
         max_tokens=300
     )
     return response.choices[0].message.content.strip()
-
-
-def fetch_channel_posts() -> list:
-    try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates?limit=100"
-        response = requests.get(url, timeout=10)
-        data = response.json()
-        posts = []
-        if data.get("ok"):
-            for update in data.get("result", []):
-                msg = update.get("channel_post")
-                if msg and msg.get("text"):
-                    chat = msg.get("chat", {})
-                    username = chat.get("username", "")
-                    if username.lower() == CHANNEL_USERNAME.lstrip("@").lower():
-                        posts.append({
-                            "text": msg["text"][:500],
-                            "message_id": msg["message_id"]
-                        })
-        return posts
-    except Exception as e:
-        logging.warning(f"fetch_channel_posts error: {e}")
-        return []
-
-
-def find_relevant_post(question: str, posts: list) -> dict | None:
-    if not posts:
-        return None
-    posts_text = "\n\n".join(
-        [f"[POST {i+1}]: {p['text']}" for i, p in enumerate(posts)]
-    )
-    prompt = f"""Given this question: "{question}"
-
-Here are recent channel posts:
-{posts_text}
-
-Which post (if any) is most relevant to answering the question?
-Reply with ONLY the post number (e.g. "3") or "NONE" if no post is relevant."""
-    try:
-        result = ask_groq(prompt)
-        result = result.strip()
-        if result == "NONE" or not result.isdigit():
-            return None
-        idx = int(result) - 1
-        if 0 <= idx < len(posts):
-            matched = posts[idx]
-            channel_name = CHANNEL_USERNAME.lstrip("@")
-            link = f"https://t.me/{channel_name}/{matched['message_id']}"
-            return {"text": matched["text"], "link": link}
-    except Exception as e:
-        logging.warning(f"find_relevant_post error: {e}")
-    return None
 
 
 async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -106,41 +62,33 @@ async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_chat_action(chat_id=message.chat_id, action="typing")
 
-    posts = fetch_channel_posts()
-    channel_context = find_relevant_post(question, posts)
-
-    if channel_context:
-        prompt = f"""Relevant channel post:
-\"\"\"{channel_context['text']}\"\"\"
-
-User question: {question}"""
-    else:
-        prompt = question
-
     try:
-        answer = ask_groq(prompt)
+        answer = ask_groq(question)
+        await message.reply_text(answer)
     except Exception as e:
         logging.error(f"Groq error: {e}")
         await message.reply_text(f"âš ï¸ Error: {str(e)[:200]}")
-        return
-
-    if channel_context:
-        answer += f"\n\nðŸ“Œ *Source:* [View channel post]({channel_context['link']})"
-        await message.reply_text(answer, parse_mode="Markdown")
-    else:
-        await message.reply_text(answer)
 
 
 def main():
+    # Clear any conflicts FIRST before starting
+    clear_telegram_conflict()
+    
+    # Small delay to ensure cleanup is complete
+    import time
+    time.sleep(3)
+
     app = (
         ApplicationBuilder()
         .token(TELEGRAM_BOT_TOKEN)
-        .arbitrary_callback_data(False)
         .build()
     )
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_mention))
     print("âœ… Bot is running with Groq!")
-    app.run_polling(allowed_updates=["message", "channel_post"], drop_pending_updates=True)
+    app.run_polling(
+        allowed_updates=["message"],
+        drop_pending_updates=True
+    )
 
 
 if __name__ == "__main__":
