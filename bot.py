@@ -26,7 +26,7 @@ SYSTEM_PROMPT = """You are a helpful assistant in a Telegram group.
 
 def ask_groq(prompt: str) -> str:
     response = client.chat.completions.create(
-        model="llama3-8b-8192",
+        model="llama3-70b-8192",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt}
