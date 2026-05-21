@@ -4,19 +4,20 @@ import requests
 import time
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from groq import Groq
+import google.generativeai as genai
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 TELEGRAM_BOT_TOKEN = "8967105953:AAEH95HkGCjnKA8uErDKla6Smuv2zG8vspY"
-GROQ_API_KEY       = "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"
+GEMINI_API_KEY     = "AIzaSyDXrGvMiuxbB8TJ5airSrtsgRpzpYudVj0"
 DATABASE_GROUP_ID  = "-1003996167181"
 PORT               = int(os.environ.get("PORT", 8080))
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 logging.basicConfig(level=logging.INFO)
-client = Groq(api_key=GROQ_API_KEY)
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel("gemini-2.0-flash")
 
 SYSTEM_PROMPT = """You are a helpful assistant for the @mullerapp Telegram channel.
 - Answer ONLY the question asked â€” brief and clear (2â€“4 sentences max).
@@ -49,22 +50,14 @@ def clear_conflict():
         logging.warning(f"Could not clear webhook: {e}")
 
 
-def ask_groq(system: str, question: str) -> str:
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": question}
-        ],
-        max_tokens=300
-    )
-    return response.choices[0].message.content.strip()
+def ask_gemini(system: str, question: str) -> str:
+    prompt = f"{system}\n\n{question}"
+    result = model.generate_content(prompt)
+    return result.text.strip()
 
 
 def fetch_database_posts() -> list:
-    """Fetch messages from private database group."""
     try:
-        # Get recent updates
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates?limit=100"
         response = requests.get(url, timeout=10)
         data = response.json()
@@ -100,7 +93,7 @@ Here are recent channel posts:
 Which post (if any) is most relevant to answering the question?
 Reply with ONLY the post number (e.g. "3") or "NONE" if no post is relevant."""
     try:
-        result = ask_groq("You are a relevance checker. Reply with only a number or NONE.", prompt)
+        result = ask_gemini("You are a relevance checker. Reply with only a number or NONE.", prompt)
         result = result.strip()
         if result == "NONE" or not result.isdigit():
             return None
@@ -119,7 +112,6 @@ async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not message or not message.text:
         return
 
-    # Ignore messages from database group
     if str(message.chat.id) == DATABASE_GROUP_ID:
         return
 
@@ -143,18 +135,18 @@ async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 User question: {question}"""
         try:
-            answer = ask_groq(SYSTEM_PROMPT, prompt)
+            answer = ask_gemini(SYSTEM_PROMPT, prompt)
             answer += f"\n\nðŸ“Œ *Source:* [View channel post]({channel_context['link']})"
             await message.reply_text(answer, parse_mode="Markdown")
         except Exception as e:
-            logging.error(f"Groq error: {e}")
+            logging.error(f"Gemini error: {e}")
             await message.reply_text(f"âš ï¸ Error: {str(e)[:200]}")
     else:
         try:
-            answer = ask_groq(SYSTEM_PROMPT, question)
+            answer = ask_gemini(SYSTEM_PROMPT, question)
             await message.reply_text(answer)
         except Exception as e:
-            logging.error(f"Groq error: {e}")
+            logging.error(f"Gemini error: {e}")
             await message.reply_text(f"âš ï¸ Error: {str(e)[:200]}")
 
 
@@ -165,7 +157,7 @@ def main():
     time.sleep(3)
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_mention))
-    print("âœ… Bot is running with Private Group Database!")
+    print("âœ… Bot is running with Gemini!")
     app.run_polling(allowed_updates=["message"], drop_pending_updates=True)
 
 
