@@ -11,7 +11,7 @@ from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTyp
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 TELEGRAM_BOT_TOKEN = "8967105953:AAEH95HkGCjnKA8uErDKla6Smuv2zG8vspY"
 GROQ_API_KEY       = "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"
-CHANNEL_USERNAME   = "@mullerapp"
+DATABASE_GROUP_ID  = "-1003996167181"
 PORT               = int(os.environ.get("PORT", 8080))
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -19,19 +19,11 @@ logging.basicConfig(level=logging.INFO)
 client = Groq(api_key=GROQ_API_KEY)
 
 SYSTEM_PROMPT = """You are a helpful assistant for the @mullerapp Telegram channel.
-
-Here is what the channel is about and key posts:
-- @mullerapp is 💡 This channel is dedicated to bring you:-  Legit Airdrop Insights, Crypto Basics, And mainly Effective strategies for earning money online
-- 🔔 I think WhatsApp is rolling out ads on statuses. Our ads will appear in Status and Channels, where people are open to discovery. The personal messaging experience on WhatsApp isn’t changing, and personal messages, calls and statuses are end-to-end encrypted and cannot be used to show ads.
-- Gas Fee ምንድነው ?, ብዙዎቻችሁ በተለይ ወደ Crypto በቅርቡ የተቀላቀላችሁ ሁሌም Gas Fee ክፈሉ ስትባሉ ለምንድን የምከፍለው ? ለማን ነው የምከፍለው ? በነፃ አይሆንም ወይ ? የሚሉ እና ሌሎች ጥያቄዎችን ታነሳላችሁ ብዬ አስባለሁ ስለዚህ ቀለል ባለ የራሴ አረዳድ ላስረዳችሁ, በመጀመሪያ Gas Fee ስንል ከስሙ እንደምትረዱት ተሽከርካሪ ወደ አንድ ቦታ ሲጓዝ ጋዝ እንደሚያስፈልገው Crypto ላይም Token ስትልኩ ፣ NFT Mint ስታደርጉ ፣ Token Stake ሲሆን ብቻ ምን አለፋችሁ Transaction Initiate በምታደርግበት ጊዜ ሁሉ ትራንሳክሽኑን ማካሄጃ Gas ያስፈልገዋል , ይህም Gas Fee ያስፈለገው Initiate የምናደርገው Transaction Secure / Decentralized በሆነ መንገድ ወደተፈለገበት መንገድ እንዲሄድ ለማስቻል ነው ( ያለ Gas Fee Transaction ማካሄድ ማለት ባዶ ተሽከርካሪ ይዞ ለመጓዝ መሞከር ማለት ነው ), ይህን Gas Fee የሚወስዱት ደግሞ በተለምዶ Validators / Miners / Stakers ሲሆኑ እነዚህ አካላት የራሳቸውን Device ክፍት በመተው / ትልቅ ገንዘብ Stake አድርገው ብቻ ትራንሳክሽኑ ለታሰበበት አላማ እንዲውል መንገድ በመሆን ግብይቱ እንዲፈፀም ያስችላሉ በዚህም ከGas Fee'ው ላይ የድርሻቸውን Reward ይቀበላሉ, ልብ ብላችሁ ከሆነ አስፈላጊ ጊዜያት ላይ ለምሳሌ Token Claim የሚደረግበትን ጊዜ ብናይ Transaction Fail የማድረግ እና Fee በጣም የሚጨምርበት ጊዜ አለ ይህ የሚሆነው ያለው የValidators / Stakers አቅርቦት አነስተኛ ስለሆነ Fail ሲያረግ ይህን ለመግታት ደግሞ Validators ከፍተኛ Gas Fee ለመክፈል የተዘጋጀውን Route ሲለሚያስቀድሙ Fee በጣም ከፍ ይላል ካሳነስን ደግሞ አይሰራም ይለናል, ይህን ስንል ግን ሁሉም Gas Fee ለእነዚህ ግለሰብ ይሄዳል ማለት አይደለም ምክንያቱም እንደየ ኔትወርኩ ቢለያይም Ethereum'ን ብንመለከት የተወሰነው Gas Fee ለValidators ሲውል የተወሰነው ግን Burn በመሆን የኮይኑን Supply ለመቀነስ ይረዳል, ማወቅ ያለባችሁ ነገር ግን ስለ Gas Fee ሲነሳ "POW" & "POS" የሚባል Concept አለ እንደኔትወርኩ ከሁለት አንዱን በተለይ "POS" በመጠቀም Gass Fee በመቀነስ የሚያገለግሉ ኔትወርኮች አሉ በተጨማሪም Layer 2 Solution በመፍጠርም ይህን ችግር ለመፍታት የሚሰሩም አሉ
-- 📣 "Token Burning" ምንድነው ? ጥቅሙስ ?
-🔥 Burning የሚለው ቃል እዚህ Crypto Space ላይ እስካላችሁ ድረስ ማወቅ ያለባችሁ Crypto Term ነው ➕, 🖥 Token Burn ሆነ ስንል ምን ለማለት መሰላችሁ : ከአንድ Token Total Supply ላይ የተወሰነ መጠኑን Circulate ከሚያደርገው ( እየተንቀሳቀሰ ካለ ) Supply ላይ ወስደን ስናቃጥል / ማለትም ያን መጠን በተለያየ መንገድ ተመልሶ ጥቅም ላይ እንዳይውል ማድረግ ነው 👌, 🔍 ለምሳሌ ያህል Notcoin ወደ 102 Billion Supply አለው ከዚህ መጠን ላይ ወደ 1 Billion የሚሆነውን መጠን ገዝተው ዳግመኛ ጥቅም ላይ እንዳይውል ማጥፋት ማለት ነው 📌, 🔍 ማጥፋት ስንል ደግሞ ለምሳሌ ያን መጠን ወደ 1 የጠፋ ዋሌት ወይንም Recovery Phrase የሌለው ባጭሩ ያን ዋሌት ማንም መጠቀም ወደ ማይችልበት Address መላክን ያካትታል 📌, ❓ታድያ ይህ ምን ጥቅም አለው ?, ✅ ለሽያጭ ከተቀመጠው ቶከን መጠን ላይ ስንቀንስ የሚሸጠው መጠን እየቀነሰ ስለሚመጣ ዋጋው እየጨመረ ይመጣል 📈, 🔍 ለምሳሌ 10 ወንበር ብትሰሩ እና እያንዳንዱን ወንበር በ100 ብር ለመግዛት ዝግጁ ሆነው የሚጠብቁ 10 ሰዎች ቢኖሩ እና ድንገት 5 ወንበር ቢጠፋ የግድ 10ሩ ሰዎች የቀረውን 5 ወንበር ለመግዛት መሻማት አለባቸው ለዚህም አቅም ያላቸው 5 ሰዎች ከሌላው ይልቅ እነሱ ለወንበሩ ለመክፈል የያዙትን ብር በመጨር ለምሳሌ በቃ እኔ 200 ብር ልክፈል እና አንዱን ወንበር ልውሰድ ማለታቸው ስለማይቀር በተዘዋዋሪ የወንበሩ ዋጋ 200 ብር ገባ ማለት ነው ስለዚህ ለቶከንም ይኼው ህግ ነው Apply የሚደረገው ✔️, ✅ በተጨማሪም Token Burn ሲሆን ፕሮጀክቱ ምን ያህል ለቶከኑ ዋጋ መጨመር ግድ የሚሰጠው ነገር እንደሆነ ስለምትረዱ ለቶከኑ ያላችሁ እምነት እየጨመረ ይሄዳል ✔️, ✅ እንዲሁም ቶከኑን የያዙት ሰዎች ይህን Burning ባዩ ቁጥር የያዙት መጠን ምን ያህል አስፈላጊ እየሆነ እንደሚሄድ ስለሚያስቡ Hold የማድረግ ፍላጎታቸውን ይጨምራል አዳዲስ Holders እራሱ መምጣት ይጀምራሉ ➕, ✅ ይህ ካሉት ማብራሪያ እና ጥቅም የተወሰነው ነው እንዲሁም የተገለፁት ጥቅሞች ባንዴ ተፅኖ ይኖራቸዋል ማለት አይደለም, 🏦 ይህ ማብራሪያ በአጠቃላይ ስለ Token Burning የሚያብራራ እንጂ አንድን Token እንዲ ይሆናል የሚል መግለጫ አይሰጥም 🔴
-
-Rules:
-- Answer ONLY the question asked — brief and clear (2–4 sentences max).
+- Answer ONLY the question asked â€” brief and clear (2â€“4 sentences max).
 - Reply in the SAME language as the user (Amharic or English).
-- When answering from channel content above, mention it's from @mullerapp.
-- Never make up information."""
+- When answering from channel content, mention it's from @mullerapp.
+- Never make up information. If unsure, say so honestly.
+- Do not add unnecessary greetings or filler words."""
 
 
 class HealthHandler(BaseHTTPRequestHandler):
@@ -69,46 +61,28 @@ def ask_groq(system: str, question: str) -> str:
     return response.choices[0].message.content.strip()
 
 
-def get_channel_id() -> str:
-    """Get the channel's numeric ID."""
+def fetch_database_posts() -> list:
+    """Fetch messages from private database group."""
     try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getChat?chat_id={CHANNEL_USERNAME}"
-        response = requests.get(url, timeout=10)
-        data = response.json()
-        if data.get("ok"):
-            return str(data["result"]["id"])
-    except Exception as e:
-        logging.warning(f"get_channel_id error: {e}")
-    return None
-
-
-def fetch_channel_posts() -> list:
-    """Fetch recent posts directly from channel using forwardFrom."""
-    try:
-        channel_id = get_channel_id()
-        if not channel_id:
-            logging.warning("Could not get channel ID")
-            return []
-
-        # Use getUpdates with channel_post allowed
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates?limit=100&allowed_updates=[%22channel_post%22,%22message%22]"
+        # Get recent updates
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates?limit=100"
         response = requests.get(url, timeout=10)
         data = response.json()
         posts = []
         if data.get("ok"):
             for update in data.get("result", []):
-                msg = update.get("channel_post")
+                msg = update.get("message")
                 if msg and msg.get("text"):
                     chat_id = str(msg.get("chat", {}).get("id", ""))
-                    if chat_id == channel_id:
+                    if chat_id == DATABASE_GROUP_ID:
                         posts.append({
                             "text": msg["text"][:500],
                             "message_id": msg["message_id"]
                         })
-        logging.info(f"Found {len(posts)} channel posts")
+        logging.info(f"Found {len(posts)} posts from database group")
         return posts
     except Exception as e:
-        logging.warning(f"fetch_channel_posts error: {e}")
+        logging.warning(f"fetch_database_posts error: {e}")
         return []
 
 
@@ -133,8 +107,7 @@ Reply with ONLY the post number (e.g. "3") or "NONE" if no post is relevant."""
         idx = int(result) - 1
         if 0 <= idx < len(posts):
             matched = posts[idx]
-            channel_name = CHANNEL_USERNAME.lstrip("@")
-            link = f"https://t.me/{channel_name}/{matched['message_id']}"
+            link = f"https://t.me/mullerapp/{matched['message_id']}"
             return {"text": matched["text"], "link": link}
     except Exception as e:
         logging.warning(f"find_relevant_post error: {e}")
@@ -145,9 +118,15 @@ async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     if not message or not message.text:
         return
+
+    # Ignore messages from database group
+    if str(message.chat.id) == DATABASE_GROUP_ID:
+        return
+
     bot_username = (await context.bot.get_me()).username
     if f"@{bot_username}" not in message.text:
         return
+
     question = message.text.replace(f"@{bot_username}", "").strip()
     if not question:
         await message.reply_text("â“ Please ask me a question after mentioning me!")
@@ -155,7 +134,7 @@ async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_chat_action(chat_id=message.chat_id, action="typing")
 
-    posts = fetch_channel_posts()
+    posts = fetch_database_posts()
     channel_context = find_relevant_post(question, posts)
 
     if channel_context:
@@ -186,8 +165,8 @@ def main():
     time.sleep(3)
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_mention))
-    print("âœ… Bot is running with Groq + Channel Search!")
-    app.run_polling(allowed_updates=["message", "channel_post"], drop_pending_updates=True)
+    print("âœ… Bot is running with Private Group Database!")
+    app.run_polling(allowed_updates=["message"], drop_pending_updates=True)
 
 
 if __name__ == "__main__":
