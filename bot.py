@@ -60,10 +60,29 @@ def ask_groq(system: str, question: str) -> str:
     return response.choices[0].message.content.strip()
 
 
-def fetch_channel_posts() -> list:
-    """Fetch recent posts from @mullerapp channel."""
+def get_channel_id() -> str:
+    """Get the channel's numeric ID."""
     try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates?limit=100"
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getChat?chat_id={CHANNEL_USERNAME}"
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        if data.get("ok"):
+            return str(data["result"]["id"])
+    except Exception as e:
+        logging.warning(f"get_channel_id error: {e}")
+    return None
+
+
+def fetch_channel_posts() -> list:
+    """Fetch recent posts directly from channel using forwardFrom."""
+    try:
+        channel_id = get_channel_id()
+        if not channel_id:
+            logging.warning("Could not get channel ID")
+            return []
+
+        # Use getUpdates with channel_post allowed
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates?limit=100&allowed_updates=[%22channel_post%22,%22message%22]"
         response = requests.get(url, timeout=10)
         data = response.json()
         posts = []
@@ -71,13 +90,13 @@ def fetch_channel_posts() -> list:
             for update in data.get("result", []):
                 msg = update.get("channel_post")
                 if msg and msg.get("text"):
-                    chat = msg.get("chat", {})
-                    username = chat.get("username", "")
-                    if username.lower() == CHANNEL_USERNAME.lstrip("@").lower():
+                    chat_id = str(msg.get("chat", {}).get("id", ""))
+                    if chat_id == channel_id:
                         posts.append({
                             "text": msg["text"][:500],
                             "message_id": msg["message_id"]
                         })
+        logging.info(f"Found {len(posts)} channel posts")
         return posts
     except Exception as e:
         logging.warning(f"fetch_channel_posts error: {e}")
@@ -85,7 +104,6 @@ def fetch_channel_posts() -> list:
 
 
 def find_relevant_post(question: str, posts: list) -> dict | None:
-    """Use Groq to find the most relevant channel post."""
     if not posts:
         return None
     posts_text = "\n\n".join(
@@ -128,7 +146,6 @@ async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_chat_action(chat_id=message.chat_id, action="typing")
 
-    # Search channel first
     posts = fetch_channel_posts()
     channel_context = find_relevant_post(question, posts)
 
@@ -161,7 +178,7 @@ def main():
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_mention))
     print("âœ… Bot is running with Groq + Channel Search!")
-    app.run_polling(allowed_updates=["message"], drop_pending_updates=True)
+    app.run_polling(allowed_updates=["message", "channel_post"], drop_pending_updates=True)
 
 
 if __name__ == "__main__":
