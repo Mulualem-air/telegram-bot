@@ -2,6 +2,8 @@ import os
 import logging
 import requests
 import time
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from groq import Groq
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
@@ -9,7 +11,7 @@ from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTyp
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 TELEGRAM_BOT_TOKEN = "8967105953:AAEH95HkGCjnKA8uErDKla6Smuv2zG8vspY"
 GROQ_API_KEY       = "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"
-CHANNEL_USERNAME   = "@mullerapp"
+PORT               = int(os.environ.get("PORT", 8080))
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 logging.basicConfig(level=logging.INFO)
@@ -20,6 +22,20 @@ SYSTEM_PROMPT = """You are a helpful assistant in a Telegram group.
 - Detect the user's language automatically and reply in the SAME language (Amharic or English).
 - Never make up information. If unsure, say so honestly.
 - Do not add unnecessary greetings or filler words."""
+
+
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is running!")
+    def log_message(self, format, *args):
+        pass
+
+
+def run_health_server():
+    server = HTTPServer(("0.0.0.0", PORT), HealthHandler)
+    server.serve_forever()
 
 
 def clear_conflict():
@@ -54,7 +70,9 @@ async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not question:
         await message.reply_text("â“ Please ask me a question after mentioning me!")
         return
+
     await context.bot.send_chat_action(chat_id=message.chat_id, action="typing")
+
     try:
         answer = ask_groq(question)
         await message.reply_text(answer)
@@ -64,11 +82,13 @@ async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def main():
+    threading.Thread(target=run_health_server, daemon=True).start()
+    logging.info(f"Health server started on port {PORT}")
     clear_conflict()
     time.sleep(3)
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_mention))
-    print("âœ… Bot is running with Groq!")
+    print("âœ… Bot is running!")
     app.run_polling(allowed_updates=["message"], drop_pending_updates=True)
 
 
