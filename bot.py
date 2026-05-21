@@ -11,6 +11,7 @@ from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTyp
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 TELEGRAM_BOT_TOKEN = "8967105953:AAEH95HkGCjnKA8uErDKla6Smuv2zG8vspY"
 GROQ_API_KEY       = "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"
+CHANNEL_USERNAME   = "@mullerapp"
 PORT               = int(os.environ.get("PORT", 8080))
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -47,16 +48,70 @@ def clear_conflict():
         logging.warning(f"Could not clear webhook: {e}")
 
 
-def ask_groq(question: str) -> str:
+def ask_groq(system: str, question: str) -> str:
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system},
             {"role": "user", "content": question}
         ],
         max_tokens=300
     )
     return response.choices[0].message.content.strip()
+
+
+def fetch_channel_posts() -> list:
+    """Fetch recent posts from @mullerapp channel."""
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates?limit=100"
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        posts = []
+        if data.get("ok"):
+            for update in data.get("result", []):
+                msg = update.get("channel_post")
+                if msg and msg.get("text"):
+                    chat = msg.get("chat", {})
+                    username = chat.get("username", "")
+                    if username.lower() == CHANNEL_USERNAME.lstrip("@").lower():
+                        posts.append({
+                            "text": msg["text"][:500],
+                            "message_id": msg["message_id"]
+                        })
+        return posts
+    except Exception as e:
+        logging.warning(f"fetch_channel_posts error: {e}")
+        return []
+
+
+def find_relevant_post(question: str, posts: list) -> dict | None:
+    """Use Groq to find the most relevant channel post."""
+    if not posts:
+        return None
+    posts_text = "\n\n".join(
+        [f"[POST {i+1}]: {p['text']}" for i, p in enumerate(posts)]
+    )
+    prompt = f"""Given this question: "{question}"
+
+Here are recent channel posts:
+{posts_text}
+
+Which post (if any) is most relevant to answering the question?
+Reply with ONLY the post number (e.g. "3") or "NONE" if no post is relevant."""
+    try:
+        result = ask_groq("You are a relevance checker. Reply with only a number or NONE.", prompt)
+        result = result.strip()
+        if result == "NONE" or not result.isdigit():
+            return None
+        idx = int(result) - 1
+        if 0 <= idx < len(posts):
+            matched = posts[idx]
+            channel_name = CHANNEL_USERNAME.lstrip("@")
+            link = f"https://t.me/{channel_name}/{matched['message_id']}"
+            return {"text": matched["text"], "link": link}
+    except Exception as e:
+        logging.warning(f"find_relevant_post error: {e}")
+    return None
 
 
 async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -73,12 +128,29 @@ async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_chat_action(chat_id=message.chat_id, action="typing")
 
-    try:
-        answer = ask_groq(question)
-        await message.reply_text(answer)
-    except Exception as e:
-        logging.error(f"Groq error: {e}")
-        await message.reply_text(f"âš ï¸ Error: {str(e)[:200]}")
+    # Search channel first
+    posts = fetch_channel_posts()
+    channel_context = find_relevant_post(question, posts)
+
+    if channel_context:
+        prompt = f"""Relevant channel post:
+\"\"\"{channel_context['text']}\"\"\"
+
+User question: {question}"""
+        try:
+            answer = ask_groq(SYSTEM_PROMPT, prompt)
+            answer += f"\n\nðŸ“Œ *Source:* [View channel post]({channel_context['link']})"
+            await message.reply_text(answer, parse_mode="Markdown")
+        except Exception as e:
+            logging.error(f"Groq error: {e}")
+            await message.reply_text(f"âš ï¸ Error: {str(e)[:200]}")
+    else:
+        try:
+            answer = ask_groq(SYSTEM_PROMPT, question)
+            await message.reply_text(answer)
+        except Exception as e:
+            logging.error(f"Groq error: {e}")
+            await message.reply_text(f"âš ï¸ Error: {str(e)[:200]}")
 
 
 def main():
@@ -88,7 +160,7 @@ def main():
     time.sleep(3)
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_mention))
-    print("âœ… Bot is running!")
+    print("âœ… Bot is running with Groq + Channel Search!")
     app.run_polling(allowed_updates=["message"], drop_pending_updates=True)
 
 
